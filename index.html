@@ -238,6 +238,15 @@
   .rank-list li.me .rk{color:var(--violet);}
   .rank-empty{font-size:11px;color:var(--text-dim);padding:10px 0;}
   .rank-clear{font-size:10px;letter-spacing:0.1em;color:var(--text-dim);background:none;border:none;cursor:pointer;padding:6px;}
+  .rank-tabs{display:flex;gap:6px;justify-content:center;margin-bottom:8px;}
+  .rank-tabs button{
+    font:700 11px/1 inherit;font-family:inherit;letter-spacing:0.08em;
+    padding:7px 16px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,0.05);border:1px solid rgba(130,170,255,0.25);color:var(--text-dim);
+  }
+  .rank-tabs button.on{background:rgba(0,229,255,0.14);border-color:var(--cyan);color:#eaf8ff;}
+  .rank-state{font-size:10.5px;color:var(--text-dim);margin-top:6px;min-height:14px;}
+  .rank-state.err{color:var(--danger);}
   .rank-clear:hover{color:var(--danger);}
 
   .btn{
@@ -649,9 +658,14 @@
         </div>
 
         <div class="rank-wrap">
-          <div class="rank-title">Top 10 · 이 기기에 저장</div>
+          <div class="rank-tabs">
+            <button type="button" id="tab-global" class="on">전체 순위</button>
+            <button type="button" id="tab-local">이 기기</button>
+          </div>
+          <div class="rank-title" id="rank-title">Top 20 · 모두의 기록</div>
           <ol class="rank-list" id="rank-list"></ol>
-          <button class="rank-clear" id="btn-clear-rank" hidden>기록 전체 지우기</button>
+          <div class="rank-state" id="rank-state"></div>
+          <button class="rank-clear" id="btn-clear-rank" hidden>이 기기 기록 지우기</button>
         </div>
 
         <button class="btn" id="btn-restart">다시 도전</button>
@@ -668,6 +682,63 @@
   </div>
 </div>
 
+<script type="module">
+/* ══════════════════════════════════════════════════════════
+   전체 순위표 — Firebase Firestore
+   · 접속 설정(firebaseConfig)은 비밀번호가 아니라 '주소표'라 공개돼도 된다.
+     실제 방어선은 Firestore 보안 규칙(firestore.rules 참고)이다.
+   · Firestore가 없거나 인터넷이 끊겨도 게임과 '이 기기' 순위표는 그대로 돌아간다.
+   ══════════════════════════════════════════════════════════ */
+const firebaseConfig = {
+  // ↓↓↓ Firebase 콘솔 → 프로젝트 설정 → 내 앱(웹) 에서 복사해 여기에 붙여 넣으면 전체 순위표가 켜집니다 ↓↓↓
+  // apiKey: "...",
+  // authDomain: "galaga-xxxx.firebaseapp.com",
+  // projectId: "galaga-xxxx",
+  // storageBucket: "galaga-xxxx.firebasestorage.app",
+  // messagingSenderId: "...",
+  // appId: "..."
+};
+
+window.CosmoCloud = { ready: false, reason: '설정 대기' };
+
+if (firebaseConfig && firebaseConfig.projectId) {
+  try {
+    const [{ initializeApp }, fs] = await Promise.all([
+      import('https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js')
+    ]);
+    const app = initializeApp(firebaseConfig);
+    const db = fs.getFirestore(app);
+    const COL = 'scores';
+
+    window.CosmoCloud = {
+      ready: true,
+      reason: '',
+      // 점수 저장 — 추가만 한다(수정·삭제는 보안 규칙에서 막는다)
+      async submit(name, score, wave) {
+        await fs.addDoc(fs.collection(db, COL), {
+          name: String(name).slice(0, 8),
+          score: Math.max(0, Math.floor(score)),
+          wave: Math.max(1, Math.floor(wave)),
+          at: fs.serverTimestamp()
+        });
+      },
+      // 상위 20개만 읽는다 — 무료 한도(하루 읽기 5만)를 아끼는 핵심
+      async top(n = 20) {
+        const q = fs.query(fs.collection(db, COL), fs.orderBy('score', 'desc'), fs.limit(n));
+        const snap = await fs.getDocs(q);
+        const out = [];
+        snap.forEach(d => out.push(Object.assign({ id: d.id }, d.data())));
+        return out;
+      }
+    };
+  } catch (e) {
+    window.CosmoCloud = { ready: false, reason: '연결 실패: ' + (e && e.message ? e.message : e) };
+    console.warn('[CosmoCloud]', e);
+  }
+}
+window.dispatchEvent(new Event('cosmocloud-ready'));
+</script>
 <script>
 (function(){
   "use strict";
@@ -1496,16 +1567,15 @@
       return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
     });
   }
-  function renderRanks(highlightId){
-    var list = loadRanks();
+  var rankTab = 'global';        // 'global' | 'local'
+  var lastHighlight = null;
+
+  function paintList(list, highlightId, emptyMsg){
     var ul = document.getElementById('rank-list');
-    var clearBtn = document.getElementById('btn-clear-rank');
     if(!list.length){
-      ul.innerHTML = '<div class="rank-empty">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</div>';
-      clearBtn.hidden = true;
+      ul.innerHTML = '<div class="rank-empty">' + emptyMsg + '</div>';
       return;
     }
-    clearBtn.hidden = false;
     ul.innerHTML = list.map(function(r, i){
       return '<li class="' + (r.id === highlightId ? 'me' : '') + '">' +
         '<span class="rk">' + (i + 1) + '</span>' +
@@ -1514,6 +1584,50 @@
         '<span class="sc">' + (r.score || 0) + '</span></li>';
     }).join('');
   }
+  function setRankState(msg, isErr){
+    var el = document.getElementById('rank-state');
+    el.textContent = msg || '';
+    el.className = 'rank-state' + (isErr ? ' err' : '');
+  }
+
+  function renderLocal(highlightId){
+    var list = loadRanks();
+    document.getElementById('rank-title').textContent = 'Top 10 · 이 기기에 저장';
+    document.getElementById('btn-clear-rank').hidden = !list.length;
+    paintList(list, highlightId, '이 기기에는 아직 기록이 없어요.');
+    setRankState('');
+  }
+  function renderGlobal(highlightId){
+    document.getElementById('rank-title').textContent = 'Top 20 · 모두의 기록';
+    document.getElementById('btn-clear-rank').hidden = true;
+    var cloud = window.CosmoCloud;
+    if(!cloud || !cloud.ready){
+      paintList([], null, '전체 순위는 아직 연결되지 않았어요.');
+      setRankState(cloud && cloud.reason ? cloud.reason : '연결 대기 중', true);
+      return;
+    }
+    setRankState('불러오는 중…');
+    cloud.top(20).then(function(list){
+      paintList(list, highlightId, '아직 아무도 기록을 남기지 않았어요. 첫 주인공이 되어 보세요!');
+      setRankState('');
+    }).catch(function(e){
+      paintList([], null, '전체 순위를 불러오지 못했어요.');
+      setRankState((e && e.code ? e.code : '오류') + ' — 잠시 후 다시 시도해 주세요.', true);
+    });
+  }
+  function renderRanks(highlightId){
+    if(highlightId) lastHighlight = highlightId;
+    if(rankTab === 'local') renderLocal(highlightId || lastHighlight);
+    else renderGlobal(highlightId || lastHighlight);
+  }
+  function switchRankTab(tab){
+    rankTab = tab;
+    document.getElementById('tab-global').classList.toggle('on', tab === 'global');
+    document.getElementById('tab-local').classList.toggle('on', tab === 'local');
+    renderRanks(null);
+  }
+  document.getElementById('tab-global').addEventListener('click', function(){ switchRankTab('global'); });
+  document.getElementById('tab-local').addEventListener('click', function(){ switchRankTab('local'); });
   function submitScore(){
     if(savedThisRun) return;
     var input = document.getElementById('player-name');
@@ -1531,6 +1645,19 @@
     savedThisRun = true;
     document.getElementById('save-row').hidden = true;
     renderRanks(entry.id);
+
+    // 전체 순위표(Firestore)에도 보낸다 — 실패해도 게임과 이 기기 기록은 그대로다
+    var cloud = window.CosmoCloud;
+    if(cloud && cloud.ready){
+      setRankState('전체 순위에 올리는 중…');
+      cloud.submit(name, score, wave).then(function(){
+        if(rankTab === 'global') renderGlobal(null);
+        else setRankState('전체 순위에 올렸어요.');
+      }).catch(function(e){
+        setRankState('전체 순위 저장 실패 — 이 기기에는 남아 있어요.', true);
+        console.warn('[CosmoCloud submit]', e);
+      });
+    }
   }
 
   function gameOver(){

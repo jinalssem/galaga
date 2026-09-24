@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// 코스모 스트라이커 전체 순위표 규칙
+// Firebase 콘솔 → Firestore Database → 규칙 탭에 붙여 넣고 [게시]를 누른다.
+//
+// 핵심: 누구나 읽을 수 있고, 새 기록을 "추가"만 할 수 있다.
+//       수정·삭제는 아무도 못 한다(관리가 필요하면 콘솔에서 직접 지운다).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /scores/{doc} {
+      allow read: if true;
+
+      allow create: if
+        // 필드는 정확히 이 네 개만
+        request.resource.data.keys().hasOnly(['name', 'score', 'wave', 'at'])
+        // 닉네임: 1~8자 문자열
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 8
+        // 점수·웨이브: 0 이상의 정수 (말도 안 되게 큰 값 차단)
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 10000000
+        && request.resource.data.wave is int
+        && request.resource.data.wave >= 1
+        && request.resource.data.wave <= 999
+        // 시간은 서버 시각만 인정
+        && request.resource.data.at == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // 그 밖의 모든 경로는 막는다
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
