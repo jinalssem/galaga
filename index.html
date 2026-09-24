@@ -690,13 +690,14 @@
    · Firestore가 없거나 인터넷이 끊겨도 게임과 '이 기기' 순위표는 그대로 돌아간다.
    ══════════════════════════════════════════════════════════ */
 const firebaseConfig = {
-  // ↓↓↓ Firebase 콘솔 → 프로젝트 설정 → 내 앱(웹) 에서 복사해 여기에 붙여 넣으면 전체 순위표가 켜집니다 ↓↓↓
-  // apiKey: "...",
-  // authDomain: "galaga-xxxx.firebaseapp.com",
-  // projectId: "galaga-xxxx",
-  // storageBucket: "galaga-xxxx.firebasestorage.app",
-  // messagingSenderId: "...",
-  // appId: "..."
+  // Firebase 콘솔 → 프로젝트 설정 → 내 앱(웹)에서 받은 값.
+  // 비밀번호가 아니라 '주소표'라서 공개돼도 된다 — 실제 방어선은 firestore.rules 다.
+  apiKey: "AIzaSyC6L64sKj9avzFsGT9oQBxkIoSUnaITE18",
+  authDomain: "galaga-rank.firebaseapp.com",
+  projectId: "galaga-rank",
+  storageBucket: "galaga-rank.firebasestorage.app",
+  messagingSenderId: "711210185257",
+  appId: "1:711210185257:web:cdd48de52ee4b0abb76238"
 };
 
 window.CosmoCloud = { ready: false, reason: '설정 대기' };
