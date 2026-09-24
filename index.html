@@ -621,7 +621,7 @@
         </div>
         <button class="btn" id="btn-start">게임 시작</button>
         <div class="howto">
-          <span><b>이동</b> ◀ ▶ ▲ ▼ / W A S D</span>
+          <span><b>이동</b> ◀ ▶ / A D</span>
           <span><b>발사</b> Space</span>
           <span><b>일시정지</b> P</span>
         </div>
@@ -661,8 +661,6 @@
     <div class="touch-controls">
       <div class="dpad">
         <div class="tbtn" id="btn-left" aria-label="왼쪽 이동">◀</div>
-        <div class="tbtn" id="btn-up" aria-label="위로 이동">▲</div>
-        <div class="tbtn" id="btn-down" aria-label="아래로 이동">▼</div>
         <div class="tbtn" id="btn-right" aria-label="오른쪽 이동">▶</div>
       </div>
       <div class="tbtn fire" id="btn-fire" aria-label="발사">FIRE</div>
@@ -794,7 +792,7 @@
   // ---------- entities ----------
   var player, bullets, enemyBullets, enemies, particles, powerups, floaters, rings;
   var keys={};
-  var touchDir=0, touchDirY=0, touchFiring=false;
+  var touchDir=0, touchFiring=false;
   var state='start'; // start | playing | paused | gameover
   var score=0, wave=1, lives=3;
   var comboCount=0, comboTimer=0;
@@ -876,7 +874,7 @@
   // ---------- input ----------
   window.addEventListener('keydown', function(e){
     keys[e.key.toLowerCase()]=true;
-    if(e.key===' ' || e.key==='ArrowUp' || e.key==='ArrowDown'){ e.preventDefault(); }
+    if(e.key===' ' || e.key==='ArrowUp' || e.key==='ArrowDown'){ e.preventDefault(); }   // 화면 스크롤 방지
     if(e.key.toLowerCase()==='p' || e.key==='Escape'){
       if(state==='playing'){ pauseGame(); }
       else if(state==='paused'){ resumeGame(); }
@@ -893,8 +891,6 @@
   }
   bindHold(document.getElementById('btn-left'), function(){ touchDir=-1; }, function(){ if(touchDir===-1) touchDir=0; });
   bindHold(document.getElementById('btn-right'), function(){ touchDir=1; }, function(){ if(touchDir===1) touchDir=0; });
-  bindHold(document.getElementById('btn-up'), function(){ touchDirY=-1; }, function(){ if(touchDirY===-1) touchDirY=0; });
-  bindHold(document.getElementById('btn-down'), function(){ touchDirY=1; }, function(){ if(touchDirY===1) touchDirY=0; });
   bindHold(document.getElementById('btn-fire'), function(){ touchFiring=true; }, function(){ touchFiring=false; });
 
   // ---------- update ----------
@@ -905,14 +901,6 @@
     if(dir===0) dir=touchDir;
     var speed = 300;
     player.x = clamp(player.x + dir*speed*dt, 18, W-18);
-
-    // 위/아래 이동 — 적 편대까지 올라가 버리지 않도록 화면 아래쪽 절반 안에서만 움직인다
-    var dirY=0;
-    if(keys['arrowup']||keys['w']) dirY-=1;
-    if(keys['arrowdown']||keys['s']) dirY+=1;
-    if(dirY===0) dirY=touchDirY;
-    var speedY = 240;
-    player.y = clamp(player.y + dirY*speedY*dt, H*0.45, H-24);
 
     if(player.invuln>0) player.invuln -= dt;
     if(player.spreadT>0) player.spreadT -= dt;
