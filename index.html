@@ -215,9 +215,10 @@
   /* ---- 기록 남기기 / 랭킹 ---- */
   .name-row{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;}
   .name-row[hidden]{display:none;}
+  .name-label{font-size:10px;letter-spacing:0.16em;color:var(--text-dim);text-transform:uppercase;}
   .name-row input{
-    font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.06em;
-    width:150px;padding:9px 12px;border-radius:10px;
+    font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0.04em;
+    width:190px;padding:11px 12px;border-radius:10px;
     background:rgba(255,255,255,0.06);border:1px solid var(--cyan-dim);color:var(--text);
     outline:none;text-align:center;
   }
@@ -653,7 +654,8 @@
         <span class="newbest" id="newbest" hidden>NEW BEST SCORE</span>
 
         <div class="name-row" id="save-row">
-          <input id="player-name" type="text" maxlength="8" placeholder="닉네임 (최대 8자)" autocomplete="off" spellcheck="false" />
+          <label class="name-label" for="player-name">닉네임</label>
+          <input id="player-name" type="text" maxlength="8" placeholder="여기에 입력 (최대 8자)" autocomplete="off" spellcheck="false" />
           <button class="btn ghost" id="btn-save-score">기록 남기기</button>
         </div>
 
@@ -944,7 +946,12 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
   }
 
   // ---------- input ----------
+  // 글자를 입력하는 칸(닉네임 등)에 포커스가 있으면 게임 조작키로 가로채지 않는다
+  function isTypingTarget(t){
+    return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  }
   window.addEventListener('keydown', function(e){
+    if(isTypingTarget(e.target)) return;
     keys[e.key.toLowerCase()]=true;
     if(e.key===' ' || e.key==='ArrowUp' || e.key==='ArrowDown'){ e.preventDefault(); }   // 화면 스크롤 방지
     if(e.key.toLowerCase()==='p' || e.key==='Escape'){
@@ -953,7 +960,20 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
     }
     Audio.resume();
   });
-  window.addEventListener('keyup', function(e){ keys[e.key.toLowerCase()]=false; });
+  window.addEventListener('keyup', function(e){
+    if(isTypingTarget(e.target)) return;
+    keys[e.key.toLowerCase()]=false;
+  });
+
+  // 결과 화면에서 아무 글자나 치면 닉네임 칸으로 바로 들어가게 한다
+  window.addEventListener('keydown', function(e){
+    if(isTypingTarget(e.target)) return;
+    if(e.ctrlKey || e.altKey || e.metaKey) return;
+    if(e.key.length !== 1 && e.key !== 'Process' && e.key !== 'Backspace') return;
+    var row = document.getElementById('save-row');
+    var inp = document.getElementById('player-name');
+    if(row && !row.hidden && inp){ inp.focus(); }
+  }, true);
 
   function bindHold(el, onDown, onUp){
     el.addEventListener('pointerdown', function(e){ e.preventDefault(); onDown(); Audio.resume(); try{el.setPointerCapture(e.pointerId);}catch(err){} });
