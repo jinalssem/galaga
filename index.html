@@ -867,6 +867,15 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
   var player, bullets, enemyBullets, enemies, particles, powerups, floaters, rings;
   var keys={};
   var touchDir=0, touchFiring=false;
+  var lastHoriz=0;          // 좌우를 함께 눌렀을 때 나중에 누른 쪽(-1 왼쪽 / +1 오른쪽)
+
+  // 창을 벗어나거나 탭이 가려지면 keyup을 못 받아 키가 눌린 채로 남는다 → 모두 놓은 것으로 본다
+  function clearKeys(){
+    keys = {};
+    lastHoriz = 0;
+    touchDir = 0;
+    touchFiring = false;
+  }
   var state='start'; // start | playing | paused | gameover
   var score=0, wave=1, lives=3;
   var comboCount=0, comboTimer=0;
@@ -952,7 +961,10 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
   }
   window.addEventListener('keydown', function(e){
     if(isTypingTarget(e.target)) return;
-    keys[e.key.toLowerCase()]=true;
+    var k = e.key.toLowerCase();
+    keys[k]=true;
+    if(k==='arrowleft' || k==='a') lastHoriz = -1;
+    if(k==='arrowright'|| k==='d') lastHoriz = 1;
     if(e.key===' ' || e.key==='ArrowUp' || e.key==='ArrowDown'){ e.preventDefault(); }   // 화면 스크롤 방지
     if(e.key.toLowerCase()==='p' || e.key==='Escape'){
       if(state==='playing'){ pauseGame(); }
@@ -965,6 +977,11 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
     keys[e.key.toLowerCase()]=false;
   });
 
+  // 포커스를 잃거나 탭이 가려질 때 키 상태를 비운다(키 끼임 방지)
+  window.addEventListener('blur', clearKeys);
+  window.addEventListener('pagehide', clearKeys);
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) clearKeys(); });
+
   // 결과 화면에서 아무 글자나 치면 닉네임 칸으로 바로 들어가게 한다
   window.addEventListener('keydown', function(e){
     if(isTypingTarget(e.target)) return;
@@ -972,7 +989,7 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
     if(e.key.length !== 1 && e.key !== 'Process' && e.key !== 'Backspace') return;
     var row = document.getElementById('save-row');
     var inp = document.getElementById('player-name');
-    if(row && !row.hidden && inp){ inp.focus(); }
+    if(row && !row.hidden && inp){ clearKeys(); inp.focus(); }
   }, true);
 
   function bindHold(el, onDown, onUp){
@@ -987,9 +1004,12 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
 
   // ---------- update ----------
   function updatePlayer(dt){
-    var dir=0;
-    if(keys['arrowleft']||keys['a']) dir-=1;
-    if(keys['arrowright']||keys['d']) dir+=1;
+    var left  = keys['arrowleft'] || keys['a'];
+    var right = keys['arrowright'] || keys['d'];
+    var dir = 0;
+    if(left && right) dir = lastHoriz;      // 둘 다 누르면 나중에 누른 쪽으로 (서로 상쇄돼 멈추지 않게)
+    else if(left)  dir = -1;
+    else if(right) dir = 1;
     if(dir===0) dir=touchDir;
     var speed = 300;
     player.x = clamp(player.x + dir*speed*dt, 18, W-18);
@@ -1543,6 +1563,7 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
   }
 
   function startGame(){
+    clearKeys();
     resize(); initStars();
     resetGame();
     state='playing';
