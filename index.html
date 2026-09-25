@@ -1,5 +1,14 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>코스모 스트라이커</title>
+<meta name="description" content="보름달 아래 편대를 뚫는 슈팅 게임. 전체 순위표와 함께.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b122b">
+<link rel="icon" href="icons/favicon.png" sizes="64x64" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="코스모">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Chakra+Petch:wght@400;500;600;700&display=swap">
@@ -558,6 +567,8 @@
   .btn.ghost:hover{ background:rgba(0,229,255,0.1); border-color:var(--cyan); color:#eaf8ff; }
 
   .howto{ gap:14px; color:#7e8cb8; }
+  #btn-install{ font-size:13px; padding:9px 18px; }
+  #btn-install[hidden]{ display:none; }
   .howto b{ color:#aebbe6; }
 
   /* ── 터치 버튼 ── */
@@ -630,6 +641,7 @@
           <div class="stat"><span class="n" id="best-preview">0</span><span class="l">Best Score</span></div>
         </div>
         <button class="btn" id="btn-start">게임 시작</button>
+        <button class="btn ghost" id="btn-install" hidden>📲 앱으로 설치</button>
         <div class="howto">
           <span><b>이동</b> ◀ ▶ / A D</span>
           <span><b>발사</b> Space</span>
@@ -1749,4 +1761,41 @@ window.dispatchEvent(new Event('cosmocloud-ready'));
 })();
 </script>
 
+<script>
+/* ── PWA: 설치와 오프라인 실행 ──────────────────────────────
+   · 서비스워커는 https(또는 localhost)에서만 동작한다. 파일을 더블클릭해 연 file:// 에서는 등록되지 않는다.
+   · 설치하면 홈 화면 아이콘으로 열리고, 두 번째부터는 인터넷 없이도 게임이 돌아간다.
+     (전체 순위표만 인터넷이 필요하고, 없으면 '이 기기' 기록으로 넘어간다) */
+(function(){
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(e){
+        console.warn('[PWA] 서비스워커 등록 실패', e);
+      });
+    });
+  }
+
+  var deferred = null;
+  var btn = document.getElementById('btn-install');
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();          // 브라우저 기본 배너 대신 우리 버튼으로
+    deferred = e;
+    if (btn) btn.hidden = false;
+  });
+
+  if (btn) {
+    btn.addEventListener('click', function(){
+      if (!deferred) return;
+      deferred.prompt();
+      deferred.userChoice.then(function(){ deferred = null; btn.hidden = true; });
+    });
+  }
+
+  window.addEventListener('appinstalled', function(){
+    deferred = null;
+    if (btn) btn.hidden = true;
+  });
+})();
+</script>
 </body></html>
